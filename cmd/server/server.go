@@ -5,6 +5,8 @@ import (
 	"ias/project/communication"
 	"net"
 	"strings"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 type server struct {
@@ -32,11 +34,21 @@ func (s *server) handlePacket(buf []byte, rlen int, originAddr *net.UDPAddr, con
 		communication.SendUDPMessage(make([]byte, 1024), conn, fmt.Sprintf("add %s %s", *ownPublicKey, fmt.Sprintf("%s/32", *interfaceIp)), *originAddr, true)
 	}
 	if query[0] == "get" {
-		publicKey := strings.ReplaceAll(message[4:], "\n", "")
+		//return peer data
+		publicKey, err := wgtypes.ParseKey(query[1])
+		if err != nil {
+			fmt.Printf("ParseKey failed: %w\n", err)
+			return err
+		}
+		endpoint, err := s.client.GetPeerEndpoint(publicKey)
+		if err != nil {
+			fmt.Printf("GetInterfaceIP failed: %w\n", err)
+			return err
+		}
 		communication.SendUDPMessage(
 			make([]byte, 1024),
 			conn,
-			fmt.Sprintf("{%s: \"%s\"}", publicKey, "hey"),
+			fmt.Sprintf("peer {%s: \"%s\"}", publicKey, endpoint),
 			*originAddr,
 			true)
 	}
@@ -64,7 +76,7 @@ func main() {
 	}
 	defer wgClient.Close()
 
-	err = wgClient.SetInterfaceIP("1")
+	err = wgClient.SetInterfaceIP("10.0.0.1")
 	if err != nil {
 		fmt.Printf("SetInterfaceIP failed: %w\n", err)
 		return

@@ -59,16 +59,16 @@ clifor:
 				fmt.Printf("GetInterfaceIP failed: %w\n", err)
 				return
 			}
-			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)
-		case "connect":
-			fmt.Println(query[0])
-			publicKey := query[1]
-			hostId := query[2]
-			err := c.client.SetInterfaceIP(hostId)
+			hostId := query[1]
+			err = c.client.SetInterfaceIP("10.0.0." + hostId)
 			if err != nil {
 				fmt.Printf("SetInterfaceIP failed: %w\n", err)
 				return
 			}
+			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)
+		case "connect":
+			fmt.Println(query[0])
+			publicKey := query[1]
 			communication.SendUDPMessage(msgBuf, conn, "get "+publicKey, *address, true)
 		case "exit":
 			communication.SendUDPMessage(msgBuf, conn, "exit", *address, true)
@@ -115,8 +115,6 @@ func main() {
 		return
 	}
 	defer wgClient.Close()
-
-	wgClient.SetInterfaceIP("2")
 
 	client := &client{client: wgClient, messages: make(chan *message), stop: make(chan bool)}
 	go client.cli(sock, server)

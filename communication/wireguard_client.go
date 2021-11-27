@@ -129,8 +129,8 @@ func (wc *WireguardClient) GetInterfaceIP() (*string, error) {
 	return &ip, nil
 }
 
-func (wc *WireguardClient) SetInterfaceIP(hostId string) error {
-	if err := utils.SudoExec("ip", "address", "replace", "dev", wc.iface, "10.0.0."+hostId); err != nil {
+func (wc *WireguardClient) SetInterfaceIP(ip string) error {
+	if err := utils.SudoExec("ip", "address", "replace", "dev", wc.iface, ip); err != nil {
 		return err
 	}
 	return nil
@@ -156,16 +156,15 @@ func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, cidr string, endpoint 
 	return nil
 }
 
-func peerConfig(peer wgtypes.Peer) wgtypes.PeerConfig {
-	endpoint := peer.Endpoint
-	publicKey := peer.PublicKey
-	keepAliveInterval := peer.PersistentKeepaliveInterval
-	allowedIPs := peer.AllowedIPs
-
-	return wgtypes.PeerConfig{
-		Endpoint:                    endpoint,
-		PublicKey:                   publicKey,
-		AllowedIPs:                  allowedIPs,
-		PersistentKeepaliveInterval: &keepAliveInterval,
+func (wc *WireguardClient) GetPeerEndpoint(publicKey wgtypes.Key) (string, error) {
+	device, err := wc.client.Device(wc.iface)
+	if err != nil {
+		return "", err
 	}
+	for _, p := range device.Peers {
+		if p.PublicKey == publicKey && p.Endpoint != nil {
+			return p.Endpoint.String(), nil
+		}
+	}
+	return "", fmt.Errorf("peer %s not found", publicKey.String())
 }
