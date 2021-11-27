@@ -15,6 +15,12 @@ type WireguardClient struct {
 	client *wgctrl.Client
 }
 
+type PeerData struct {
+	PublicKey string
+	Ip        string
+	Endpoint  string
+}
+
 func NewWireguardClient(iface string) (*WireguardClient, error) {
 	wgClient, err := wgctrl.New()
 	if err != nil {
@@ -156,17 +162,17 @@ func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, cidr string, endpoint 
 	return nil
 }
 
-func (wc *WireguardClient) GetPeerEndpoint(publicKey wgtypes.Key) (string, error) {
+func (wc *WireguardClient) GetPeerIPAndEndpoint(publicKey wgtypes.Key) (string, string, error) {
 	device, err := wc.client.Device(wc.iface)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	for _, p := range device.Peers {
 		fmt.Println(p.PublicKey.String())
 		fmt.Println(publicKey.String())
 		if p.PublicKey == publicKey && p.Endpoint != nil {
-			return p.Endpoint.String(), nil
+			return p.Endpoint.String(), p.AllowedIPs[0].String(), nil
 		}
 	}
-	return "", fmt.Errorf("peer %s not found", publicKey.String())
+	return "", "", fmt.Errorf("peer %s not found", publicKey.String())
 }

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"ias/project/communication"
+	"ias/project/utils"
 	"net"
-	"strings"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -15,20 +16,25 @@ type server struct {
 
 const DEFAULT_DEVICE_NAME = "wg1"
 
-func (s *server) handlePacket(buf []byte, rlen int, originAddr *net.UDPAddr, conn *net.UDPConn) error {
-	message := strings.ReplaceAll(string(buf[0:rlen]), "\n", "")
-	query := strings.Split(message, " ")
+func (s *server) handlePacket(message string, originAddr *net.UDPAddr, conn *net.UDPConn) error {
+	query := utils.GetQuery(message)
 	if query[0] == "add" {
-		communication.HandleAdd(query[1], query[2], s.client.AddPeer, nil)
+		publicKey, err := wgtypes.ParseKey(query[1])
+		if err != nil {
+			return err
+		}
+		ip := query[2]
+		err = s.client.AddPeer(publicKey, ip, nil)
+		if err != nil {
+			return err
+		}
 		//Reply with add
 		ownPublicKey, err := s.client.GetDevicePublicKey()
 		if err != nil {
-			fmt.Printf("GetDevicePublicKey failed: %w\n", err)
 			return err
 		}
 		interfaceIp, err := s.client.GetInterfaceIP()
 		if err != nil {
-			fmt.Printf("GetInterfaceIP failed: %w\n", err)
 			return err
 		}
 		communication.SendUDPMessage(make([]byte, 1024), conn, fmt.Sprintf("add %s %s", *ownPublicKey, fmt.Sprintf("%s/32", *interfaceIp)), *originAddr, true)
@@ -37,18 +43,25 @@ func (s *server) handlePacket(buf []byte, rlen int, originAddr *net.UDPAddr, con
 		//return peer data
 		publicKey, err := wgtypes.ParseKey(query[1])
 		if err != nil {
-			fmt.Printf("ParseKey failed: %w\n", err)
 			return err
 		}
-		endpoint, err := s.client.GetPeerEndpoint(publicKey)
+		ip, endpoint, err := s.client.GetPeerIPAndEndpoint(publicKey)
 		if err != nil {
-			fmt.Printf("GetInterfaceIP failed: %w\n", err)
+			return err
+		}
+		data := &communication.PeerData{
+			PublicKey: query[1],
+			Ip:        ip,
+			Endpoint:  endpoint,
+		}
+		jsonData, err := json.Marshal(data)
+		if err != nil {
 			return err
 		}
 		communication.SendUDPMessage(
 			make([]byte, 1024),
 			conn,
-			fmt.Sprintf("peer {%s: \"%s\"}", publicKey, endpoint),
+			fmt.Sprintf("peer %s", string(jsonData)),
 			*originAddr,
 			true)
 	}
@@ -90,6 +103,6 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		go server.handlePacket(buf, rlen, originAddr, sock)
+		go server.handlePacket(string(buf[0:rlen]), originAddr, sock)
 	}
 }

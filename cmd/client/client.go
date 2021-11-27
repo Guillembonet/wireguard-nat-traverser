@@ -2,21 +2,24 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"ias/project/communication"
+	"ias/project/utils"
 	"net"
 	"os"
 	"strings"
-	"sync"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 const DEFAULT_DEVICE_NAME = "wg0"
 
 type client struct {
-	lock     sync.Mutex
-	client   *communication.WireguardClient
-	messages chan *message
-	stop     chan bool
+	client     *communication.WireguardClient
+	messages   chan *message
+	stop       chan bool
+	clientType string
 }
 
 type message struct {
@@ -25,27 +28,51 @@ type message struct {
 	originAddr *net.UDPAddr
 }
 
-func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net.UDPConn) {
-	c.lock.Lock()
-	query := strings.Split(strings.ReplaceAll(message, "\n", ""), " ")
+func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net.UDPConn) error {
+	query := utils.GetQuery(message)
 	originAddr.Port = 2021
 	if query[0] == "add" {
-		err := communication.HandleAdd(query[1], query[2], c.client.AddPeer, originAddr)
+		publicKey, err := wgtypes.ParseKey(query[1])
 		if err != nil {
-			fmt.Printf("HandleAdd failed: %w\n", err)
-			return
+			return err
+		}
+		ip := query[2]
+		err = c.client.AddPeer(publicKey, ip, nil)
+		if err != nil {
+			return err
 		}
 	}
+	if query[0] == "peer" {
+		fmt.Println(query[1])
+		peerData := &communication.PeerData{}
+		json.Unmarshal([]byte(query[1]), peerData)
+		publicKey, err := wgtypes.ParseKey(peerData.PublicKey)
+		if err != nil {
+			return err
+		}
+		endpointAddr, err := net.ResolveUDPAddr("udp", peerData.Endpoint)
+		if err != nil {
+			return err
+		}
+		cidr := peerData.Ip + "/32"
+		if strings.HasPrefix(c.clientType, "c") {
+			cidr = "0.0.0.0/0"
+		}
+		err = c.client.AddPeer(publicKey, cidr, endpointAddr)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *client) cli(conn *net.UDPConn, address *net.UDPAddr) {
 	reader := bufio.NewReader(os.Stdin)
 	msgBuf := make([]byte, 1024)
 
-clifor:
 	for {
 		text, _ := reader.ReadString('\n')
-		query := strings.Split(strings.ReplaceAll(text, "\n", ""), " ")
+		query := utils.GetQuery(text)
 
 		switch query[0] {
 		case "add":
@@ -67,13 +94,13 @@ clifor:
 			}
 			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)
 		case "connect":
-			fmt.Println(query[0])
 			publicKey := query[1]
 			communication.SendUDPMessage(msgBuf, conn, "get "+publicKey, *address, true)
+		case "set":
+			c.clientType = query[1]
 		case "exit":
 			communication.SendUDPMessage(msgBuf, conn, "exit", *address, true)
 			c.stop <- true
-			break clifor
 		}
 	}
 }
