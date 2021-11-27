@@ -68,12 +68,20 @@ func (wc *WireguardClient) createDevice() error {
 	if err != nil {
 		return err
 	}
+	err = utils.SudoExec("ip", "route", "add", "10.0.0.0/24", "dev", wc.iface)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 func (wc *WireguardClient) destroyDevice() error {
-	err := utils.SudoExec("ip", "link", "del", "dev", wc.iface)
+	err := utils.SudoExec("ip", "route", "del", "10.0.0.0/24")
+	if err != nil {
+		return err
+	}
+	err = utils.SudoExec("ip", "link", "del", "dev", wc.iface)
 	if err != nil {
 		return err
 	}
@@ -137,7 +145,7 @@ func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, cidr string, endpoint 
 	if err != nil {
 		return err
 	}
-	defaultKeepAlive := time.Second * 5
+	defaultKeepAlive := time.Hour * 5
 	peer := wgtypes.PeerConfig{PublicKey: publicKey, PersistentKeepaliveInterval: &defaultKeepAlive, AllowedIPs: []net.IPNet{*peerIps}, Endpoint: endpoint}
 	config := wgtypes.Config{
 		PrivateKey: &device.PrivateKey,

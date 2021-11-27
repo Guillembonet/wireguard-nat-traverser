@@ -28,6 +28,7 @@ type message struct {
 func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net.UDPConn) {
 	c.lock.Lock()
 	query := strings.Split(strings.ReplaceAll(message, "\n", ""), " ")
+	originAddr.Port = 2021
 	if query[0] == "add" {
 		err := communication.HandleAdd(query[1], query[2], c.client.AddPeer, originAddr)
 		if err != nil {
@@ -58,7 +59,7 @@ clifor:
 				fmt.Printf("GetInterfaceIP failed: %w\n", err)
 				return
 			}
-			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/32", *interfaceIp)), *address, true)
+			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)
 		case "connect":
 			fmt.Println(query[0])
 			publicKey := query[1]
