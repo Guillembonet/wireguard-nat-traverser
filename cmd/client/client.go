@@ -8,6 +8,7 @@ import (
 	"ias/project/utils"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -37,7 +38,7 @@ func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net
 			return err
 		}
 		ip := query[2]
-		endpointAddr, err := net.ResolveUDPAddr("udp", os.Args[2])
+		endpointAddr, err := net.ResolveUDPAddr("udp", os.Args[1]+":"+os.Args[3])
 		if err != nil {
 			return err
 		}
@@ -123,25 +124,30 @@ func (c *client) handleMessages(conn *net.UDPConn) error {
 }
 
 func main() {
-	sock, err := communication.CreateUDPSocket(":2000")
+	sock, err := communication.CreateUDPSocket(os.Args[5])
 	if err != nil {
 		fmt.Printf("Failed: %w\n", err)
 		return
 	}
 	defer sock.Close()
 
-	server, err := net.ResolveUDPAddr("udp", os.Args[1])
+	server, err := net.ResolveUDPAddr("udp", os.Args[1]+":"+os.Args[2])
 	if err != nil {
-		fmt.Printf("Could not resolve %s:2000\n", os.Args[1])
+		fmt.Printf("Could not resolve %s:%s\n", os.Args[1], os.Args[2])
 		return
 	}
 
-	wgClient, err := communication.NewWireguardClient(DEFAULT_DEVICE_NAME)
+	wgClient, err := communication.NewWireguardClient(os.Args[4])
 	if err != nil {
 		fmt.Printf("New Wireguard client failed: %w\n", err)
 		return
 	}
-	err = wgClient.ConfigureWireguardClient(2001)
+	port, err := strconv.Atoi(os.Args[6])
+	if err != nil {
+		fmt.Printf("No wireguard port supplied: %w\n", err)
+		return
+	}
+	err = wgClient.ConfigureWireguardClient(port)
 	if err != nil {
 		fmt.Printf("Configure wireguard client failed: %w\n", err)
 		wgClient.Close()
