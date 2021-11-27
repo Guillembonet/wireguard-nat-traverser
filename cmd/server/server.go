@@ -28,6 +28,7 @@ func (s *server) handlePacket(message string, originAddr *net.UDPAddr, conn *net
 		if err != nil {
 			return err
 		}
+		fmt.Printf("Added peer %s %s\n", query[1], ip)
 		//Reply with add
 		ownPublicKey, err := s.client.GetDevicePublicKey()
 		if err != nil {

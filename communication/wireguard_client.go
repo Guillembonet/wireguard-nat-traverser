@@ -151,7 +151,7 @@ func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, cidr string, endpoint 
 	if err != nil {
 		return err
 	}
-	defaultKeepAlive := time.Hour * 5
+	defaultKeepAlive := time.Second * 5
 	peer := wgtypes.PeerConfig{PublicKey: publicKey, PersistentKeepaliveInterval: &defaultKeepAlive, AllowedIPs: []net.IPNet{*peerIps}, Endpoint: endpoint}
 	config := wgtypes.Config{
 		PrivateKey: &device.PrivateKey,
@@ -168,10 +168,8 @@ func (wc *WireguardClient) GetPeerIPAndEndpoint(publicKey wgtypes.Key) (string, 
 		return "", "", err
 	}
 	for _, p := range device.Peers {
-		fmt.Println(p.PublicKey.String())
-		fmt.Println(publicKey.String())
 		if p.PublicKey == publicKey && p.Endpoint != nil {
-			return p.Endpoint.String(), p.AllowedIPs[0].String(), nil
+			return p.AllowedIPs[0].String(), p.Endpoint.String(), nil
 		}
 	}
 	return "", "", fmt.Errorf("peer %s not found", publicKey.String())

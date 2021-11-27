@@ -37,15 +37,21 @@ func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net
 			return err
 		}
 		ip := query[2]
-		err = c.client.AddPeer(publicKey, ip, nil)
+		endpointAddr, err := net.ResolveUDPAddr("udp", os.Args[2])
 		if err != nil {
 			return err
 		}
+		err = c.client.AddPeer(publicKey, ip, endpointAddr)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Added peer %s %s\n", query[1], ip)
 	}
 	if query[0] == "peer" {
 		fmt.Println(query[1])
 		peerData := &communication.PeerData{}
 		json.Unmarshal([]byte(query[1]), peerData)
+		fmt.Printf("Add peer %s\n", peerData.PublicKey)
 		publicKey, err := wgtypes.ParseKey(peerData.PublicKey)
 		if err != nil {
 			return err
@@ -92,7 +98,7 @@ func (c *client) cli(conn *net.UDPConn, address *net.UDPAddr) {
 				fmt.Printf("GetInterfaceIP failed: %w\n", err)
 				return
 			}
-			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)
+			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/32", *interfaceIp)), *address, true)
 		case "connect":
 			publicKey := query[1]
 			communication.SendUDPMessage(msgBuf, conn, "get "+publicKey, *address, true)
@@ -124,9 +130,9 @@ func main() {
 	}
 	defer sock.Close()
 
-	server, err := net.ResolveUDPAddr("udp", "192.168.1.23:2020")
+	server, err := net.ResolveUDPAddr("udp", os.Args[1])
 	if err != nil {
-		fmt.Printf("Could not resolve 127.0.0.1:2000\n")
+		fmt.Printf("Could not resolve %s:2000\n", os.Args[1])
 		return
 	}
 
