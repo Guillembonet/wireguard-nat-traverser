@@ -128,17 +128,17 @@ func (wc *WireguardClient) SetInterfaceIP(hostId string) error {
 	return nil
 }
 
-func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, ip string) error {
+func (wc *WireguardClient) AddPeer(publicKey wgtypes.Key, cidr string, endpoint *net.UDPAddr) error {
 	device, err := wc.client.Device(wc.iface)
 	if err != nil {
 		return err
 	}
-	_, peerIps, err := net.ParseCIDR(fmt.Sprintf("%s/32", ip))
+	_, peerIps, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return err
 	}
 	defaultKeepAlive := time.Second * 5
-	peer := wgtypes.PeerConfig{PublicKey: publicKey, PersistentKeepaliveInterval: &defaultKeepAlive, AllowedIPs: []net.IPNet{*peerIps}}
+	peer := wgtypes.PeerConfig{PublicKey: publicKey, PersistentKeepaliveInterval: &defaultKeepAlive, AllowedIPs: []net.IPNet{*peerIps}, Endpoint: endpoint}
 	config := wgtypes.Config{
 		PrivateKey: &device.PrivateKey,
 		ListenPort: &device.ListenPort,

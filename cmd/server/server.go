@@ -17,7 +17,7 @@ func (s *server) handlePacket(buf []byte, rlen int, originAddr *net.UDPAddr, con
 	message := strings.ReplaceAll(string(buf[0:rlen]), "\n", "")
 	query := strings.Split(message, " ")
 	if query[0] == "add" {
-		communication.HandleAdd(query[1], query[2], s.client.AddPeer)
+		communication.HandleAdd(query[1], query[2], s.client.AddPeer, nil)
 		//Reply with add
 		ownPublicKey, err := s.client.GetDevicePublicKey()
 		if err != nil {
@@ -29,7 +29,7 @@ func (s *server) handlePacket(buf []byte, rlen int, originAddr *net.UDPAddr, con
 			fmt.Printf("GetInterfaceIP failed: %w\n", err)
 			return err
 		}
-		communication.SendUDPMessage(make([]byte, 1024), conn, fmt.Sprintf("add %s %s", *ownPublicKey, *interfaceIp), *originAddr, true)
+		communication.SendUDPMessage(make([]byte, 1024), conn, fmt.Sprintf("add %s %s", *ownPublicKey, fmt.Sprintf("%s/32", *interfaceIp)), *originAddr, true)
 	}
 	if query[0] == "get" {
 		publicKey := strings.ReplaceAll(message[4:], "\n", "")

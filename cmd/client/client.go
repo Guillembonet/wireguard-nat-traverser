@@ -25,11 +25,15 @@ type message struct {
 	originAddr *net.UDPAddr
 }
 
-func (c *client) handlePacket(message string, originAddr net.Addr, conn *net.UDPConn) {
+func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net.UDPConn) {
 	c.lock.Lock()
 	query := strings.Split(strings.ReplaceAll(message, "\n", ""), " ")
 	if query[0] == "add" {
-		communication.HandleAdd(query[1], query[2], c.client.AddPeer)
+		err := communication.HandleAdd(query[1], query[2], c.client.AddPeer, originAddr)
+		if err != nil {
+			fmt.Printf("HandleAdd failed: %w\n", err)
+			return
+		}
 	}
 }
 
@@ -54,7 +58,7 @@ clifor:
 				fmt.Printf("GetInterfaceIP failed: %w\n", err)
 				return
 			}
-			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, *interfaceIp), *address, true)
+			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/32", *interfaceIp)), *address, true)
 		case "connect":
 			fmt.Println(query[0])
 			publicKey := query[1]
@@ -92,7 +96,7 @@ func main() {
 	}
 	defer sock.Close()
 
-	server, err := net.ResolveUDPAddr("udp", "127.0.0.1:2020")
+	server, err := net.ResolveUDPAddr("udp", "192.168.1.23:2020")
 	if err != nil {
 		fmt.Printf("Could not resolve 127.0.0.1:2000\n")
 		return
