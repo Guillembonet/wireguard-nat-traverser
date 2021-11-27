@@ -54,15 +54,15 @@ clifor:
 				fmt.Printf("GetDevicePublicKey failed: %w\n", err)
 				return
 			}
-			interfaceIp, err := c.client.GetInterfaceIP()
-			if err != nil {
-				fmt.Printf("GetInterfaceIP failed: %w\n", err)
-				return
-			}
 			hostId := query[1]
 			err = c.client.SetInterfaceIP("10.0.0." + hostId)
 			if err != nil {
 				fmt.Printf("SetInterfaceIP failed: %w\n", err)
+				return
+			}
+			interfaceIp, err := c.client.GetInterfaceIP()
+			if err != nil {
+				fmt.Printf("GetInterfaceIP failed: %w\n", err)
 				return
 			}
 			communication.SendUDPMessage(msgBuf, conn, fmt.Sprintf("add %s %s", *publicKey, fmt.Sprintf("%s/24", *interfaceIp)), *address, true)

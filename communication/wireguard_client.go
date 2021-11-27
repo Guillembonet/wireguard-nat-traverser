@@ -162,6 +162,8 @@ func (wc *WireguardClient) GetPeerEndpoint(publicKey wgtypes.Key) (string, error
 		return "", err
 	}
 	for _, p := range device.Peers {
+		fmt.Println(p.PublicKey.String())
+		fmt.Println(publicKey.String())
 		if p.PublicKey == publicKey && p.Endpoint != nil {
 			return p.Endpoint.String(), nil
 		}
