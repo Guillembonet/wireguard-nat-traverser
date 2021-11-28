@@ -104,6 +104,9 @@ func (c *client) cli(conn *net.UDPConn, address *net.UDPAddr) {
 			communication.SendUDPMessage(msgBuf, conn, "get "+publicKey, *address, true)
 		case "set":
 			c.clientType = query[1]
+		case "ping":
+			address, _ := net.ResolveUDPAddr("udp", query[1])
+			communication.SendUDPMessage(msgBuf, conn, "ping", *address, true)
 		case "exit":
 			communication.SendUDPMessage(msgBuf, conn, "exit", *address, true)
 			c.stop <- true
