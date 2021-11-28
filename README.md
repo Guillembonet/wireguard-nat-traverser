@@ -1,1 +1,1 @@
-# wireguard-nat-traverser
+# Wireguard NAT traverser
