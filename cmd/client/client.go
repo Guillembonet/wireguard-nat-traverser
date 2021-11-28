@@ -52,7 +52,6 @@ func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net
 		fmt.Println(query[1])
 		peerData := &communication.PeerData{}
 		json.Unmarshal([]byte(query[1]), peerData)
-		fmt.Printf("Add peer %s\n", peerData.PublicKey)
 		publicKey, err := wgtypes.ParseKey(peerData.PublicKey)
 		if err != nil {
 			return err
@@ -61,7 +60,7 @@ func (c *client) handlePacket(message string, originAddr *net.UDPAddr, conn *net
 		if err != nil {
 			return err
 		}
-		cidr := peerData.Ip + "/32"
+		cidr := peerData.Ip
 		if strings.HasPrefix(c.clientType, "c") {
 			cidr = "0.0.0.0/0"
 		}
@@ -124,7 +123,7 @@ func (c *client) handleMessages(conn *net.UDPConn) error {
 }
 
 func main() {
-	sock, err := communication.CreateUDPSocket(os.Args[5])
+	sock, err := communication.CreateUDPSocket(":"+os.Args[5])
 	if err != nil {
 		fmt.Printf("Failed: %w\n", err)
 		return
