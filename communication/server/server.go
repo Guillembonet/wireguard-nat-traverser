@@ -102,14 +102,4 @@ func (s *Server) handlePacket(message string, originAddr *net.UDPAddr) {
 		s.sendLock.Unlock()
 		log.Printf("Returned peer data: %s\n", string(jsonData))
 	}
-	// remove
-	if query[0] == "remove" {
-		cidr := originAddr.IP.String() + "/32"
-		err := s.client.RemovePeerByAllowedIP(cidr)
-		if err != nil {
-			log.Println(fmt.Errorf("RemovePeerByAllowedIP failed: %w", err))
-			return
-		}
-		log.Printf("Removed %s\n", cidr)
-	}
 }

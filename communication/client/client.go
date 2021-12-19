@@ -155,11 +155,6 @@ func (c *Client) cli() {
 			}
 		// remove
 		case "remove":
-			err := communication.SendUDPMessage(msgBuf, c.conn, "remove", *c.serverAddr, false)
-			if err != nil {
-				log.Println(fmt.Errorf("SendUDPMessage failed: %w", err))
-				break
-			}
 			c.client.RemovePeerByAllowedIP(c.serverAddr.String() + "/32")
 			c.serverAddr = c.initialServerAddr
 			log.Println("Removed server connection")
@@ -174,10 +169,6 @@ func (c *Client) cli() {
 				c.isConsumer = false
 				log.Println("Provider mode set")
 			}
-		case "rules":
-			communication.CreateConsumerRules(c.client)
-		case "rrules":
-			communication.RemoveConsumerRules(c.client)
 		// exit
 		case "exit":
 			err := communication.SendUDPMessage(msgBuf, c.conn, "exit", *c.serverAddr, false)
