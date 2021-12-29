@@ -1,5 +1,9 @@
 # Wireguard NAT traverser
 
+## How to build
+
+Install golang and use `go build ./cmd/client` and `go build ./cmd/server` on the project root to generate the executables. Then try to run them without arguments to see usage.
+
 ## How does it work?
 
 To understand how it works we will look at the different available commands:
