@@ -3,81 +3,82 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"ias/project/communication"
-	"ias/project/utils"
 	"log"
 	"net"
 	"sync"
 
+	"github.com/guillembonet/wireguard-nat-traverser/communication"
+	"github.com/guillembonet/wireguard-nat-traverser/connection"
+	"github.com/guillembonet/wireguard-nat-traverser/constants"
+	"github.com/guillembonet/wireguard-nat-traverser/utils"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 type Server struct {
-	client   *communication.WireguardClient
-	conn     *net.UDPConn
-	msgBuf   []byte
-	sendLock sync.Mutex
+	manager connectionManager
+	conn    *net.UDPConn
+	lock    sync.Mutex
 }
 
-func CreateServer(client *communication.WireguardClient, conn *net.UDPConn) *Server {
-	return &Server{client: client, conn: conn, msgBuf: make([]byte, 1024)}
+type connectionManager interface {
+	AddPeer(publicKey wgtypes.Key, cidr string, endpoint *net.UDPAddr, replacePeers bool) error
+	GetPublicKey() (*wgtypes.Key, error)
+	GetInterfaceIP() (string, error)
+	Cleanup() error
+	GetPeer(wgtypes.Key) (connection.Peer, error)
 }
 
-func (s *Server) Start() {
-	go communication.ListenUDP(s.conn, s.handlePacket)
+func NewServer(manager connectionManager, conn *net.UDPConn) *Server {
+	return &Server{manager: manager, conn: conn}
 }
 
-func (s *Server) Close() error {
-	err := s.conn.Close()
-	if err != nil {
-		return err
-	}
-	return s.client.Close()
+func (s *Server) Start() error {
+	return communication.ListenUDP(s.conn, s.handlePacket)
 }
 
 func (s *Server) handlePacket(message string, originAddr *net.UDPAddr) {
-	query := utils.GetQuery(message)
+	args := utils.GetQuery(message)
+	switch args[0] {
 	// add <public_key> <ip>
-	if query[0] == "add" {
-		publicKey, err := wgtypes.ParseKey(query[1])
+	case constants.AddQuery:
+		publicKey, err := wgtypes.ParseKey(args[1])
 		if err != nil {
 			log.Println(fmt.Errorf("public key parsing failed: %w", err))
 			return
 		}
-		err = s.client.AddPeer(publicKey, query[2]+"/32", nil, false)
+		err = s.manager.AddPeer(publicKey, args[2]+"/32", nil, false)
 		if err != nil {
 			log.Println(fmt.Errorf("AddPeer failed: %w", err))
 			return
 		}
 		//Reply with add
-		ownPublicKey, err := s.client.GetDevicePublicKey()
+		ownPublicKey, err := s.manager.GetPublicKey()
 		if err != nil {
 			log.Println(fmt.Errorf("GetDevicePublicKey failed: %w", err))
 			return
 		}
-		interfaceIp, err := s.client.GetInterfaceIP()
+		interfaceIp, err := s.manager.GetInterfaceIP()
 		if err != nil {
 			log.Println(fmt.Errorf("GetInterfaceIP failed: %w", err))
 			return
 		}
-		s.sendLock.Lock()
-		err = communication.SendUDPMessage(s.msgBuf, s.conn, fmt.Sprintf("add %s %s", *ownPublicKey, *interfaceIp), *originAddr, false)
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		err = communication.SendUDPMessage(s.conn, fmt.Sprintf("add %s %s", ownPublicKey.String(), interfaceIp), *originAddr)
 		if err != nil {
 			log.Println(fmt.Errorf("SendUDPMessage failed: %w", err))
-			s.sendLock.Unlock()
 			return
 		}
-		s.sendLock.Unlock()
-		log.Printf("Added peer %s and replied\n", query[1])
-	}
+		log.Printf("Added peer %s and replied\n", args[1])
+		return
 	// get <public_key>
-	if query[0] == "get" {
-		publicKey, err := wgtypes.ParseKey(query[1])
+	case constants.GetQuery:
+		publicKey, err := wgtypes.ParseKey(args[1])
 		if err != nil {
 			log.Println(fmt.Errorf("public key parsing failed: %w", err))
 			return
 		}
-		peer, err := s.client.GetPeer(publicKey)
+		peer, err := s.manager.GetPeer(publicKey)
 		if err != nil {
 			log.Println(fmt.Errorf("GetPeer failed: %w", err))
 			return
@@ -87,19 +88,14 @@ func (s *Server) handlePacket(message string, originAddr *net.UDPAddr) {
 			log.Println(fmt.Errorf("encoding peer failed: %w", err))
 			return
 		}
-		s.sendLock.Lock()
-		err = communication.SendUDPMessage(
-			s.msgBuf,
-			s.conn,
-			fmt.Sprintf("peer %s", string(jsonData)),
-			*originAddr,
-			false)
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		err = communication.SendUDPMessage(s.conn, fmt.Sprintf("peer %s", string(jsonData)), *originAddr)
 		if err != nil {
 			log.Println(fmt.Errorf("SendUDPMessage failed: %w", err))
-			s.sendLock.Unlock()
 			return
 		}
-		s.sendLock.Unlock()
 		log.Printf("Returned peer data: %s\n", string(jsonData))
+		return
 	}
 }

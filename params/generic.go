@@ -3,9 +3,10 @@ package params
 import "flag"
 
 type Generic struct {
-	UDPPort       int
-	WireguardPort int
-	InterfaceName string
+	UDPPort         int
+	WireguardPort   int
+	InterfaceName   string
+	TunnelSlash24IP string
 }
 
 func (g *Generic) Init() {
